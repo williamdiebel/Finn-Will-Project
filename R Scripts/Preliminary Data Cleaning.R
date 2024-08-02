@@ -127,10 +127,25 @@ strata_with_treated_and_control <- panel_joined_complete_cases %>%
   filter(any(treated == 1) & any(treated == 0)) %>%
   ungroup()
 
+  # counting unique treated firms
+strata_with_treated_and_control %>%
+  filter(treated == 1) %>%
+  summarise(unique_gvkey_count = n_distinct(gvkey)) %>%
+  pull(unique_gvkey_count)
+  # 47
+
+  # counting unique control firms
+strata_with_treated_and_control %>%
+  filter(treated == 0) %>%
+  summarise(unique_gvkey_count = n_distinct(gvkey)) %>%
+  pull(unique_gvkey_count)
+  # 201
+
   # count the number of unique strata
 strata_with_treated_and_control %>%
   summarise(unique_strata_count = n_distinct(strata)) %>%
   pull(unique_strata_count)
+
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # DD models ####
