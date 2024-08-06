@@ -43,7 +43,7 @@ See **Data Files and Relevant Measures** and **Scripts** sections below for rele
 
 ### 3. rrpanel_comp_fs_fortune_cdp.rds
 - **Description:**
-  - Panel data for firms in RepRisk and Compustat. This unbalanced panel contains 171323 firm-year observations from 2007 to 2020, including 14640 unique firms.
+  - Panel data for population of firms in RepRisk and Compustat. This unbalanced panel contains 171323 firm-year observations from 2007 to 2020, including 14640 unique firms.
 - **ID Variables:**
   - Same as **2. data_essay2_robustness_v2.rds**.
 - **Key Measures:**
