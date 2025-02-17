@@ -6,15 +6,16 @@
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
   # Edit working directory accordingly before importing data ********
-setwd(file.path("/Users/williamdiebel/Library/CloudStorage", 
-                "Dropbox/Will:Finn Shared/Data"))
+setwd("~/Dropbox/Will:Finn Shared/Data")
 
 # Load required packages: tidyverse and fixest ********
 library(tidyverse)
 library(fixest)
 
-# Load datasets
-panel_wd <- readRDS("data_essay2_robustness_v2.rds") 
+# Load datasets 
+      # *Feb 2025 update: reading in the rrpanel_comp_fs_fortune_cdp.rds data 
+      # instead of pre-matched data_essay2_robustness_v2.rds
+panel_wd <- readRDS("rrpanel_comp_fs_fortune_cdp.rds") 
 panel_fp <- read_csv("IndependentVariables_07232024.csv",
                      col_types = "ciciiiiii")
 
@@ -86,6 +87,7 @@ panel_fp_dupes_cleaned <- panel_fp_dupes %>%
   ungroup()
 
 panel_fp_cleaned <- rbind(panel_fp_dupes_cleaned, panel_fp_non_dupes)
+saveRDS(panel_fp_cleaned, "panel_fp_cleaned.rds")
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # Data merging and inspection ####
@@ -93,114 +95,90 @@ panel_fp_cleaned <- rbind(panel_fp_dupes_cleaned, panel_fp_non_dupes)
 
 panel_joined <- left_join(panel_wd, panel_fp_cleaned)
 
-  # looking at obs w successful matches
+  # looking at obs w successful matches (CSO is appropriate to filter on since
+  # all obs in the panel_fp_cleaned data have non-NA CSO values)
 panel_joined_complete_cases <- panel_joined %>% filter(!(is.na(CSO)))
-  # 2618/12616 = 21% of obs matched
+  # 29455/76836 = 38% of obs matched
 
-  # breaking down by unique firms
-panel_joined_complete_cases %>%
-  summarise(unique_gvkey_count = n_distinct(gvkey)) %>%
-  pull(unique_gvkey_count)
-  # 257 unique firms from my dataset w/ matched CSO data
-  
-  # counting treated firms w CSO data
-panel_joined_complete_cases %>%
-  filter(treated == 1) %>%
-  summarise(unique_gvkey_count = n_distinct(gvkey)) %>%
-  pull(unique_gvkey_count)
-  # 49 are treated obs
+  # Looking deeper into aspects of the merging (attempting to understand the
+  # matching rate above)
+panel_fp_cleaned$gvkey %>% n_distinct()
+      # 7515
+panel_joined_complete_cases$gvkey %>% n_distinct()
+      # 2919
+      # 2919/7515 = 39% of firms from Finn's data matched
 
-  # counting control firms w CSO data
-panel_joined_complete_cases %>%
-  filter(treated == 0) %>%
-  summarise(unique_gvkey_count = n_distinct(gvkey)) %>%
-  pull(unique_gvkey_count)
-  # 208 are control obs
+  ## Looking at characteristics of merged sample ####
+    ### Unique Firms ####
+      # gvkey
+        panel_fp$gvkey %>% n_distinct()
+        # 7515
+        panel_wd %>% filter(headquarter_country%in%c("United States of America",
+                                                     "Canada")) %>% 
+          select(reprisk_id) %>% n_distinct()
+        # 3854
+        
+        # 2919/3854 = 76% of firm from Will's data matched
 
-  # since my panel has already undergone matching, its maybe most relevant to
-  # look within cem matching strata to understand how many strata contain both
-  # at least 1 treated and 1 control obs.
+    ### Country characteristics ####
+        panel_joined_complete_cases$headquarter_country %>% unique()
+        
+        # [1]  "Canada"                                               "United States of America"                            
+        # [3]  "Switzerland"                                          "United Kingdom of Great Britain and Northern Ireland"
+        # [5]  "Australia"                                            "Ireland"                                             
+        # [7]  "China"                                                "Netherlands"                                         
+        # [9]  "Greece"                                               "Cayman Islands"                                      
+        # [11] "Bermuda Islands (UK)"                                 "Virgin Islands; British"                             
+        # [13] "Panama"                                               "Israel"                                              
+        # [15] "Germany"                                              "United States Minor Outlying Islands"
+        
+        # It would be helpful to know why non-North American headquartered firms 
+        # are included.
+        
+        # Follow up: open a Git hub issue -- provide at least one or two 
+        # examples of non-North American firms.
+        
+        panel_joined_complete_cases %>% 
+          filter(!headquarter_country%in%c("United States of America",
+                                           "Canada")) %>%
+          group_by(conm, gvkey, headquarter_country) %>% summarise()
+        
+          # # A tibble: 48 × 3
+          # # Groups:   conm, gvkey [48]
+          #    conm                         gvkey  headquarter_country                                 
+          #    <chr>                        <chr>  <chr>                                               
+          #  1 ACCENTURE PLC                143357 Ireland                                             
+          #  2 ADVANCED BATTERY TECH INC    2831   China                                               
+          #  3 ALLIED HEALTHCARE INTL INC   25972  United Kingdom of Great Britain and Northern Ireland
+          #  4 ALPHA AND OMEGA SEMICONDUCTO 184604 Bermuda Islands (UK)                                
+          #  5 AMCOR PLC                    100243 United Kingdom of Great Britain and Northern Ireland
+          #  6 AMICAS INC                   65072  Germany                                             
+          #  7 AON PLC                      3221   Ireland                                             
+          #  8 APCO OIL AND GAS INTL INC    1682   Cayman Islands                                      
+          #  9 ARGO GROUP INTL HOLDINGS LTD 15364  Bermuda Islands (UK)                                
+          # 10 ASML HOLDING NV              61214  Netherlands
+        
+    ### Industrial characteristics ####
+        panel_joined_complete_cases$FourDigitName %>% unique()
+        
+        #  [1] "Materials"                                      "Retailing"                                      "Semiconductors & Semiconductor Equipment"      
+        #  [4] "Software & Services"                            "Energy"                                         "Commercial & Professional Services"            
+        #  [7] "Technology Hardware & Equipment"                "Consumer Durables & Apparel"                    "Diversified Financials"                        
+        # [10] "Capital Goods"                                  "Utilities"                                      "Household & Personal Products"                 
+        # [13] "Transportation"                                 "Consumer Services"                              "Health Care Equipment & Services"              
+        # [16] "Pharmaceuticals, Biotechnology & Life Sciences" "Banks"                                          "Food, Beverage & Tobacco"                      
+        # [19] "Media & Entertainment"                          "Real Estate"                                    "Insurance"                                     
+        # [22] "Automobiles & Components"                       "Telecommunication Services"                     "Food & Staples Retailing"      
 
-  # identify strata with at least one treated and one control observation
-strata_with_treated_and_control <- panel_joined_complete_cases %>%
-  group_by(strata) %>%
-  filter(any(treated == 1) & any(treated == 0)) %>%
-  ungroup()
-
-  # counting unique treated firms
-strata_with_treated_and_control %>%
-  filter(treated == 1) %>%
-  summarise(unique_gvkey_count = n_distinct(gvkey)) %>%
-  pull(unique_gvkey_count)
-  # 47
-
-  # counting unique control firms
-strata_with_treated_and_control %>%
-  filter(treated == 0) %>%
-  summarise(unique_gvkey_count = n_distinct(gvkey)) %>%
-  pull(unique_gvkey_count)
-  # 201
-
-  # count the number of unique strata
-strata_with_treated_and_control %>%
-  summarise(unique_strata_count = n_distinct(strata)) %>%
-  pull(unique_strata_count)
-
-
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-# DD models ####
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-
-# main model
-model <- feols(total_incident_count ~ cdp_sc_member + log(at_usd) + 
-                 prop_suppliers_cdp_sc + roa_winsor + 
-                 supplier_count + CSO | firm_strata + year,
-               data = strata_with_treated_and_control,
-               cluster = "firm_strata",
-               weights = ~w)
-summary(model)
-
-# spotlight mechanism test
-model <- feols(total_incident_count ~ cdp_sc_member*log(at_usd) + 
-                 prop_suppliers_cdp_sc + roa_winsor + 
-                 supplier_count + CSO | firm_strata + year,
-               data = strata_with_treated_and_control,
-               cluster = "firm_strata",
-               weights = ~w)
-summary(model)
-
-# CSO interaction test
-model <- feols(total_incident_count ~ cdp_sc_member*CSO + log(at_usd) +
-                 prop_suppliers_cdp_sc + roa_winsor + 
-                 supplier_count | firm_strata + year,
-               data = strata_with_treated_and_control,
-               cluster = "firm_strata",
-               weights = ~w)
-summary(model)
-
-# CSO three-way interaction test
-model <- feols(total_incident_count ~ cdp_sc_member*log(at_usd)*CSO + 
-                 prop_suppliers_cdp_sc + roa_winsor + 
-                 supplier_count | firm_strata + year,
-               data = strata_with_treated_and_control,
-               cluster = "firm_strata",
-               weights = ~w)
-summary(model)
-
-# ESG Committee interaction test
-model <- feols(total_incident_count ~ cdp_sc_member*ESG_Committee + log(at_usd) +
-                 prop_suppliers_cdp_sc + roa_winsor + 
-                 supplier_count | firm_strata + year,
-               data = strata_with_treated_and_control,
-               cluster = "firm_strata",
-               weights = ~w)
-summary(model)
-
-# ESG Committee three-way interaction test
-model <- feols(total_incident_count ~ cdp_sc_member*log(at_usd)*ESG_Committee + 
-                 prop_suppliers_cdp_sc + roa_winsor + 
-                 supplier_count | firm_strata + year,
-               data = strata_with_treated_and_control,
-               cluster = "firm_strata",
-               weights = ~w)
-summary(model)
+        # Diverse industrial characteristics... eventually, it might be worth
+        # looking more narrowly at mfg firms.
+        
+# Exporting data ####
+saveRDS(panel_joined_complete_cases, "panel_intersection.rds")
+        
+        
+        
+        
+        
+        
+        
