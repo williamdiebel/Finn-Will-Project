@@ -175,10 +175,14 @@ panel_joined_complete_cases$gvkey %>% n_distinct()
         
 # Exporting data ####
 saveRDS(panel_joined_complete_cases, "panel_intersection.rds")
-        
-        
-        
-        
-        
-        
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
+# Baseline TWFE
+
+model <- feols(total_incident_count ~ cdp_sc_member + log(at_gbp) + 
+               + roa + 
+               + CSO | reprisk_id + year,
+               data = panel_joined_complete_cases,
+               cluster = "reprisk_id")
+summary(model)
         
