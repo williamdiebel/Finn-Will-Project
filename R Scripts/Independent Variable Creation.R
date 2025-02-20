@@ -62,7 +62,8 @@ dt_master <- as.data.table(read.csv("./02_Data/rawdata/Compustat_2008-2024.csv")
   .[,Year := fyear]
 
 # Merge with CSO and ESG Committee information from BoardEx 
-dt_BoardEx <- load_BoardEx(link_tbl = link)
+#dt_BoardEx <- load_BoardEx(link_tbl = link)  # BoardEx files were too big for the Dropbox, so I saved the output of this function instead. The code is still at the end of this document.
+dt_BoardEx <- as.data.table(readRDS("./02_Data/secdata/BoardEx.rds"))
 dt_master <- merge(dt_master[, .(gvkey, cusip, Year)], dt_BoardEx[, .(gvkey, Year, CSO, ESG_Committee)],
                    all.x = TRUE,
                    by.x = c("gvkey","Year"), by.y = c("gvkey","Year"))
