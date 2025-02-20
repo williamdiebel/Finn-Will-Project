@@ -124,12 +124,12 @@ dt_final <- merge(dt_master[, .(gvkey, Year)],
 
 load_BoardEx <- function(link_tbl = NULL){
   # CSO Role ----
-  dt_TMT <- as.data.table(read_dta("G:/My Drive/10_Carlson/05_Research/07_GovernanceAndMisconduct/02_Data/rawdata/organization_composition_officers_directors_1990_2021.dta"))
+  dt_TMT <- as.data.table(read_dta("./02_Data/rawdata/organization_composition_officers_directors_1990_2021.dta"))
 
   
   
   # CSO Gender
-  dt_TMT_Profiles <- as.data.table(read_dta("G:/My Drive/10_Carlson/05_Research/07_GovernanceAndMisconduct/02_Data/rawdata/individual_profile_details.dta"))
+  dt_TMT_Profiles <- as.data.table(read_dta("./02_Data/rawdata/individual_profile_details.dta"))
   
   dt_TMT <- merge(dt_TMT,
                   dt_TMT_Profiles[,c("DirectorID", "Gender")])
@@ -172,9 +172,9 @@ load_BoardEx <- function(link_tbl = NULL){
   
   
   # Committees ---- 
-  dt_committee <- as.data.table(read_dta("G:/My Drive/10_Carlson/05_Research/07_GovernanceAndMisconduct/02_Data/rawdata/organization_board_director_committees.dta"))
+  dt_committee <- as.data.table(read_dta("./02_Data/rawdata/organization_board_director_committees.dta"))
   
-  committees <- read.csv("G:/My Drive/10_Carlson/05_Research/07_GovernanceAndMisconduct/02_Data/secdata/organization_board_director_committees.csv")%>%
+  committees <- read.csv("./02_Data/secdata/organization_board_director_committees.csv")%>%
     filter(Combined=="x")%>%
     select(Committee.Name)
   
