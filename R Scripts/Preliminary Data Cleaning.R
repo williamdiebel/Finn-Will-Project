@@ -197,6 +197,9 @@ panel_intersection <- readRDS("panel_intersection.rds")
     panel_intersection$cdp_supplier_inv_count[which(is.na(panel_intersection$cdp_supplier_inv_count))] <- 0
     panel_intersection$cdp_supplier_sc_count[which(is.na(panel_intersection$cdp_supplier_sc_count))] <- 0
     panel_intersection$cdp_supplier_member_count[which(is.na(panel_intersection$cdp_supplier_member_count))] <- 0
+    panel_intersection$prop_suppliers_cdp_sc[which(is.na(panel_intersection$prop_suppliers_cdp_sc))] <- 0
+    panel_intersection$prop_suppliers_cdp_inv[which(is.na(panel_intersection$prop_suppliers_cdp_inv))] <- 0
+    panel_intersection$prop_suppliers_cdp[which(is.na(panel_intersection$prop_suppliers_cdp))] <- 0
   
   # Saving results
     saveRDS(panel_intersection, "panel_intersection_v2.rds")
@@ -229,15 +232,14 @@ panel_intersection <- readRDS("panel_intersection.rds")
                 t.test(CSO_firms_panel$at_gbp_winsorized_1, non_CSO_firms_panel$at_gbp_winsorized_1)
                   # CSO firms are smaller in total assets
                 # Comparing roa
-                t.test(CSO_firms_panel$roa, non_CSO_firms_panel$roa)
-                t.test(CSO_firms_panel$roa_winsorized_1, non_CSO_firms_panel$roa_winsorized_1)
-                
-                
                 ggplot(CSO_firms_panel, aes(roa)) + 
                   geom_histogram(bins = 100) + geom_boxplot()
                 ggplot(non_CSO_firms_panel, aes(roa)) + 
                   geom_histogram(bins = 100) + geom_boxplot()
-            
+                
+                t.test(CSO_firms_panel$roa, non_CSO_firms_panel$roa)
+                t.test(CSO_firms_panel$roa_winsorized_1, non_CSO_firms_panel$roa_winsorized_1)
+                
             # Subsample cross-sectional characteristics
               # CSO firms
               CSO_firms_cross_sectional <- data.frame(conm = CSO_firms, 
@@ -264,7 +266,7 @@ panel_intersection <- readRDS("panel_intersection.rds")
               # GICS Industry Group tables
               CSO_firms_cross_sectional %>% group_by(FourDigitName) %>% count() %>% arrange(desc(n))
               non_CSO_firms_cross_sectional %>% group_by(FourDigitName) %>% count() %>% arrange(desc(n))
-        
+              
         # TWFE models
         model <- feols(total_incident_count ~ cdp_sc_member + log(at_gbp) + supplier_count + prop_suppliers_cdp_sc +
                + roa 
@@ -280,23 +282,6 @@ panel_intersection <- readRDS("panel_intersection.rds")
                | FourDigitName + year, # Industry and time fixed effects
                data = panel_intersection,
                cluster = "reprisk_id")
-        summary(model)
-        
-        # Excluding the measures based on FactSet (SC) data
-        model <- feols(total_incident_count ~ cdp_sc_member + log(at_gbp) +
-                        roa +  
-                        CSO
-                        | reprisk_id + year, # Firm and time fixed effects
-                        data = panel_intersection,
-                        cluster = "reprisk_id")
-        summary(model)
-        
-        model <- feols(total_incident_count ~ cdp_sc_member + log(at_gbp) + 
-                         roa +
-                         CSO
-                         | FourDigitName + year, # Industry and time fixed effects
-                         data = panel_intersection,
-                         cluster = "reprisk_id")
         summary(model)
         
     # Winsorized models
@@ -316,23 +301,6 @@ panel_intersection <- readRDS("panel_intersection.rds")
                | FourDigitName + year, # Industry and time fixed effects
                data = panel_intersection,
                cluster = "reprisk_id")
-        summary(model)
-        
-        # Excluding the measures based on FactSet (SC) data
-        model <- feols(total_incident_count ~ cdp_sc_member + log(at_gbp_winsorized_1) +
-                        roa_winsorized_1 +  
-                        CSO
-                        | reprisk_id + year, # Firm and time fixed effects
-                        data = panel_intersection,
-                        cluster = "reprisk_id")
-        summary(model)
-        
-        model <- feols(total_incident_count ~ cdp_sc_member + log(at_gbp_winsorized_1) + 
-                         roa_winsorized_1 +
-                         CSO
-                         | FourDigitName + year, # Industry and time fixed effects
-                         data = panel_intersection,
-                         cluster = "reprisk_id")
         summary(model)
         
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
