@@ -89,7 +89,7 @@ panel_fp_dupes_cleaned <- panel_fp_dupes %>%
 
 panel_fp_cleaned <- rbind(panel_fp_dupes_cleaned, panel_fp_non_dupes)
 saveRDS(panel_fp_cleaned, "panel_fp_cleaned.rds")
-
+panel_fp_cleaned <- readRDS("panel_fp_cleaned.rds")
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # Data merging and inspection ####
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -304,10 +304,38 @@ panel_intersection <- readRDS("panel_intersection.rds")
         summary(model)
         
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
-# Next -- I want to fill in the missing FactSet data for the 8 - 9k obs
-
-
-
-
-
-        
+# Looking at the missing firms from the Compustat, CRSP, BoardEx merging table
+          
+          # Importing the link table
+        link <- data.table::data.table(haven::read_dta('/Users/william.diebel/Dropbox/Will:Finn Shared/02_Data/rawdata/boardex_crsp_compustat_linking_table_16032021.dta'))
+        link$gvkey <- as.character(link$gvkey)
+          # Unique firms in the linking table (double checking to make sure each gvkey is distinct)
+        link %>% n_distinct(.[, gvkey]) # [1] 10027: checks out
+          # Next: 1. counting how many gvkeys from my initial "raw" panel show up in the linking table
+          #       2. counting how many gvkeys from finn's data show up in the linking table (should be all?)
+          #       3. counting how many gvkeys from panel_intersection show up in the linking table
+                    
+            # 1. counting how many gvkeys from my initial "raw" panel show up in the linking table
+            gvkeys_panel_wd <- panel_wd %>% distinct(gvkey)
+            length(which(gvkeys_panel_wd$gvkey%in%link$gvkey)) # [1] 1014: much lower than anticipated
+              # following finn's approach in "Independent Variable Creation.R"
+                # first, retaining only the american and canadian firms
+            panel_wd_us_can <- panel_wd %>% filter(headquarter_country_code %in% c("US","CA"))
+            panel_wd_us_can$gvkey %>% n_distinct() # [1] 3854: number of unique US/CAN firms in my raw data
+                # then, filtering based on firms in the linking table
+            panel_wd_us_can <- panel_wd %>% filter(gvkey %in% link$gvkey)
+            panel_wd_us_can$gvkey %>% n_distinct() # [1] 1014: number of unique firms after filtering based on what's in the linking table. i.e., same outcome as identified in line 320
+            
+            # 2. counting how many gvkeys from finn's data show up in the linking table (should be all?)
+              # counting the initial amount of firms before filtering on the linking table
+            panel_fp_cleaned$gvkey %>% n_distinct() # [1] 7515: unique gvkeys
+              # filtering on linking table
+            panel_fp_cleaned <- panel_fp_cleaned %>% filter(gvkey%in%link$gvkey)
+            panel_fp_cleaned$gvkey %>% n_distinct() # [1] 2549: gvkeys found in the linking table
+            
+            # 3. counting how many gvkeys from panel_intersection show up in the linking table
+            gvkeys_panel_intersection <- panel_intersection %>% distinct(gvkey)
+            gvkeys_panel_intersection$gvkey %>% n_distinct() # [1] 2542: unique gvkeys in the merged data
+            length(which(gvkeys_panel_intersection$gvkey%in%link$gvkey)) # [1] 834: gvkeys found in the linking table
+            
+            
