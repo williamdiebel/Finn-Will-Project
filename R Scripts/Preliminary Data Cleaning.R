@@ -11,6 +11,7 @@ setwd("~/Dropbox/Will:Finn Shared/Data")
 # Load required packages: tidyverse and fixest ********
 library(tidyverse)
 library(fixest)
+library(robustHD)
 
 # Load datasets 
       # *Feb 2025 update: reading in the rrpanel_comp_fs_fortune_cdp.rds data 
@@ -175,14 +176,170 @@ panel_joined_complete_cases$gvkey %>% n_distinct()
         
 # Exporting data ####
 saveRDS(panel_joined_complete_cases, "panel_intersection.rds")
+        
+# Resuming here ####
+panel_intersection <- readRDS("panel_intersection.rds")
+  
+  # Retaining firms in US and Canada
+  panel_intersection <- panel_intersection %>% filter(headquarter_country%in%c("United States of America", "Canada"))
 
+  # Winsorizing total assets and roa
+  panel_intersection$roa_winsorized_1 <- winsorize(panel_intersection$roa, probs = 0.01)
+  panel_intersection$at_gbp_winsorized_1 <- winsorize(panel_intersection$at_gbp, probs = 0.01)
+
+  # Correcting for missing supply base factors: 1. Remove obs with no factset ID; 2. Code 0 for obs with missing supplier count data
+    # 1. Remove obs with no factset ID
+    panel_intersection <- panel_intersection[-which(is.na(panel_intersection$factset_id)), ]
+    
+    # 2. code 0 for obs with missing supplier count data
+    
+    panel_intersection$supplier_count[which(is.na(panel_intersection$supplier_count))] <- 0 
+    panel_intersection$cdp_supplier_inv_count[which(is.na(panel_intersection$cdp_supplier_inv_count))] <- 0
+    panel_intersection$cdp_supplier_sc_count[which(is.na(panel_intersection$cdp_supplier_sc_count))] <- 0
+    panel_intersection$cdp_supplier_member_count[which(is.na(panel_intersection$cdp_supplier_member_count))] <- 0
+  
+  # Saving results
+    saveRDS(panel_intersection, "panel_intersection_v2.rds")
+    panel_intersection <- readRDS("panel_intersection_v2.rds")
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
-# Baseline TWFE
-
-model <- feols(total_incident_count ~ cdp_sc_member + log(at_gbp) + 
-               + roa + 
-               + CSO | reprisk_id + year,
-               data = panel_joined_complete_cases,
+        # Summary stats
+            # Want to look at composition of CSO firms and non-CSO firms
+            
+            # First, extracting a list of all CSO firms in the sample
+            CSO_firms <- panel_intersection %>% filter(CSO==1)
+            CSO_firms <- unique(CSO_firms$conm) # creates list of all firms that appoint a CSO
+            
+              # and all non-CSO firms
+              non_CSO_firms <- panel_intersection %>% filter(!(conm%in%CSO_firms))
+              non_CSO_firms <- unique(non_CSO_firms$conm)
+        
+            # Subsample panel characteristics
+              # CSO firms
+              CSO_firms_panel <- panel_intersection %>% filter(conm%in%CSO_firms)
+              # Non-CSO firms
+              non_CSO_firms_panel <- panel_intersection %>% filter(conm%in%non_CSO_firms)
+          
+                # Comparing total assets
+                ggplot(CSO_firms_panel, aes(at_gbp)) + 
+                  geom_histogram() + geom_boxplot()
+                ggplot(non_CSO_firms_panel, aes(at_gbp)) + 
+                  geom_histogram() + geom_boxplot()
+                
+                t.test(CSO_firms_panel$at_gbp, non_CSO_firms_panel$at_gbp)
+                t.test(CSO_firms_panel$at_gbp_winsorized_1, non_CSO_firms_panel$at_gbp_winsorized_1)
+                  # CSO firms are smaller in total assets
+                # Comparing roa
+                t.test(CSO_firms_panel$roa, non_CSO_firms_panel$roa)
+                t.test(CSO_firms_panel$roa_winsorized_1, non_CSO_firms_panel$roa_winsorized_1)
+                
+                
+                ggplot(CSO_firms_panel, aes(roa)) + 
+                  geom_histogram(bins = 100) + geom_boxplot()
+                ggplot(non_CSO_firms_panel, aes(roa)) + 
+                  geom_histogram(bins = 100) + geom_boxplot()
+            
+            # Subsample cross-sectional characteristics
+              # CSO firms
+              CSO_firms_cross_sectional <- data.frame(conm = CSO_firms, 
+                                                      stringsAsFactors = FALSE)
+              CSO_firms_cross_sectional <- left_join(CSO_firms_cross_sectional, 
+                                                     panel_intersection %>% 
+                                                       select(conm, 
+                                                              FourDigitName, 
+                                                              headquarter_country), 
+                                                     multiple = "first")
+              # Non-CSO firms
+              non_CSO_firms_cross_sectional <- data.frame(conm = non_CSO_firms,
+                                                          stringsAsFactors = FALSE)
+              non_CSO_firms_cross_sectional <- left_join(non_CSO_firms_cross_sectional,
+                                                         panel_intersection %>%
+                                                           select(conm,
+                                                                  FourDigitName,
+                                                                  headquarter_country),
+                                                         multiple = "first")
+            
+              # Headquarter country tables
+              CSO_firms_cross_sectional %>% group_by(headquarter_country) %>% count() %>% arrange(desc(n))
+              non_CSO_firms_cross_sectional %>% group_by(headquarter_country) %>% count() %>% arrange(desc(n))
+              # GICS Industry Group tables
+              CSO_firms_cross_sectional %>% group_by(FourDigitName) %>% count() %>% arrange(desc(n))
+              non_CSO_firms_cross_sectional %>% group_by(FourDigitName) %>% count() %>% arrange(desc(n))
+        
+        # TWFE models
+        model <- feols(total_incident_count ~ cdp_sc_member + log(at_gbp) + supplier_count + prop_suppliers_cdp_sc +
+               + roa 
+               + CSO
+               | reprisk_id + year, # Firm and time fixed effects
+               data = panel_intersection,
                cluster = "reprisk_id")
-summary(model)
+        summary(model)
+        
+        model <- feols(total_incident_count ~ cdp_sc_member + log(at_gbp) + supplier_count + prop_suppliers_cdp_sc +
+               + roa 
+               + CSO
+               | FourDigitName + year, # Industry and time fixed effects
+               data = panel_intersection,
+               cluster = "reprisk_id")
+        summary(model)
+        
+        # Excluding the measures based on FactSet (SC) data
+        model <- feols(total_incident_count ~ cdp_sc_member + log(at_gbp) +
+                        roa +  
+                        CSO
+                        | reprisk_id + year, # Firm and time fixed effects
+                        data = panel_intersection,
+                        cluster = "reprisk_id")
+        summary(model)
+        
+        model <- feols(total_incident_count ~ cdp_sc_member + log(at_gbp) + 
+                         roa +
+                         CSO
+                         | FourDigitName + year, # Industry and time fixed effects
+                         data = panel_intersection,
+                         cluster = "reprisk_id")
+        summary(model)
+        
+    # Winsorized models
+        
+        # TWFE models
+        model <- feols(total_incident_count ~ cdp_sc_member + log(at_gbp_winsorized_1) + supplier_count + prop_suppliers_cdp_sc +
+               + roa_winsorized_1 
+               + CSO
+               | reprisk_id + year, # Firm and time fixed effects
+               data = panel_intersection,
+               cluster = "reprisk_id")
+        summary(model)
+        
+        model <- feols(total_incident_count ~ cdp_sc_member + log(at_gbp_winsorized_1) + supplier_count + prop_suppliers_cdp_sc +
+               + roa_winsorized_1 
+               + CSO
+               | FourDigitName + year, # Industry and time fixed effects
+               data = panel_intersection,
+               cluster = "reprisk_id")
+        summary(model)
+        
+        # Excluding the measures based on FactSet (SC) data
+        model <- feols(total_incident_count ~ cdp_sc_member + log(at_gbp_winsorized_1) +
+                        roa_winsorized_1 +  
+                        CSO
+                        | reprisk_id + year, # Firm and time fixed effects
+                        data = panel_intersection,
+                        cluster = "reprisk_id")
+        summary(model)
+        
+        model <- feols(total_incident_count ~ cdp_sc_member + log(at_gbp_winsorized_1) + 
+                         roa_winsorized_1 +
+                         CSO
+                         | FourDigitName + year, # Industry and time fixed effects
+                         data = panel_intersection,
+                         cluster = "reprisk_id")
+        summary(model)
+        
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
+# Next -- I want to fill in the missing FactSet data for the 8 - 9k obs
+
+
+
+
+
         
