@@ -12,6 +12,8 @@ setwd("~/Dropbox/Will:Finn Shared/Data")
 library(tidyverse)
 library(fixest)
 library(robustHD)
+library(MatchIt)
+library(cem)
 
 # Load datasets 
       # *Feb 2025 update: reading in the rrpanel_comp_fs_fortune_cdp.rds data 
@@ -338,4 +340,72 @@ panel_intersection <- readRDS("panel_intersection.rds")
             gvkeys_panel_intersection$gvkey %>% n_distinct() # [1] 2542: unique gvkeys in the merged data
             length(which(gvkeys_panel_intersection$gvkey%in%link$gvkey)) # [1] 834: gvkeys found in the linking table
             
+# CEM ####
+# For each treated unit, we'll define the first period of treatment as t = 0
+# Then, we'll identify matches based on data corresponding to t = - 1
+
+            # Step 1: Identify when each unit first gets treated
+            panel_intersection <- panel_intersection %>%
+              group_by(reprisk_id) %>% # operation looks within each firm
+              mutate(treatment_start = ifelse(any(CSO == 1), # identifies whether it is "treated", i.e., CSO == 1
+                                              min(year[CSO == 1], na.rm = TRUE), NA)) %>% # and, if so, assigns the initial treatment period (min year)
+              ungroup()
+
+            panel_intersection %>% select(conm, year, CSO, treatment_start) %>% filter(conm == "POLYMET MINING CORP") # visually inspecting a CSO firm to ensure the above worked as intended
+              # looks good
+            
+            # Step 2: Identify pre-treatment period observations (t - 1), ensuring the pre-treatment period is correctly identified at the unit level
+            panel_intersection <- panel_intersection %>%
+              group_by(reprisk_id) %>%  # Grouping ensures correct reference to treatment_start
+              mutate(pre_treatment = ifelse(!is.na(treatment_start) & year == treatment_start - 1, 1, 0)) %>%
+              ungroup()
+            
+            panel_intersection %>% select(conm, year, CSO, treatment_start, pre_treatment) %>% filter(conm == "POLYMET MINING CORP") # visually inspecting a CSO firm to ensure the above worked as intended
+              # looks good
+            
+            # Step 3: Subset pre-treatment treated units & potential controls
+            pre_treatment_observations <- panel_intersection %>% filter(pre_treatment == 1) # these are all the firms for which we observe CSO entries
+            never_treated <- panel_intersection %>% filter(!(conm %in% pre_treatment_observations$conm)) # these are all the obs for which we do not observe CSO entries
+              # since some firms have CSOs prior to the beginning of our observational periods (e.g., "VISA INC"), let's initially filter out those obs as potential controls
+            never_treated <- never_treated %>% filter(CSO==0) # removing firms with CSO prior to panel
+            
+            # Step 4: Assigning matching covariates
+            exact_matching_vars <- c("year", "headquarter_country", "FourDigitName")  # Exact match on these
+            coarsened_vars <- c("at_gbp_winsorized_1", "roa_winsorized_1")  # Apply coarsened exact matching            
+
+            # Step 5: Create cem table by merging the pre-treatment observations with the never treated observations
+            cem_prepped_matching_table <- rbind(pre_treatment_observations, never_treated) 
+            
+                # Ensure categorical variables are properly formatted
+                cem_prepped_matching_table <- cem_prepped_matching_table %>%
+                  mutate(across(all_of(exact_matching_vars), as.factor)) %>%
+                  mutate(across(all_of(coarsened_vars), as.numeric)) %>%
+                  drop_na(all_of(c(exact_matching_vars, coarsened_vars)))  # Remove rows with missing covariates
+                
+            # Step 6: Apply cem using default Sturges' rule
+            
+            cem_match <- cem(
+              treatment = "pre_treatment",
+              data = cem_prepped_matching_table,
+              drop = setdiff(names(cem_prepped_matching_table), c("pre_treatment", exact_matching_vars, coarsened_vars)),  # Keep only relevant vars
+              grouping = exact_matching_vars,  # Ensure exact matching on these
+              keep.all = TRUE  # Keep unmatched units for balance diagnostics
+            )
+            
+            cem_matches <- cem_prepped_matching_table[cem_match$matched, ] # extracting the matched dataset
+            cem_matches$w <- cem_match$w[cem_match$matched] # extracting the cem weights
+            cem_matches$strata <- cem_match$strata[cem_match$matched] # extracting the cem strata
+
+            # summary of matching results
+                # number of control/treated firms
+                table(cem_matches$pre_treatment)
+                                                    # 0   1 
+                                                    # 873 267 
+                
+                # number of unique matching strata in matches
+                cem_matches$strata %>% n_distinct()
+                                                    # [1] 234
+                
+            # saving cem matches following Sturges' rule
+                saveRDS(cem_matches, "cem_matches_Sturges_Mar5.rds")
             
