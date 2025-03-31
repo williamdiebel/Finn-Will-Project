@@ -14,6 +14,9 @@ library(fixest)
 library(robustHD)
 library(MatchIt)
 library(cem)
+library(cobalt)  # For balance diagnostics
+library(ggplot2)
+library(gridExtra)  # For arranging multiple plots
 
 # Load datasets 
       # *Feb 2025 update: reading in the rrpanel_comp_fs_fortune_cdp.rds data 
@@ -408,4 +411,79 @@ panel_intersection <- readRDS("panel_intersection.rds")
                 
             # saving cem matches following Sturges' rule
                 saveRDS(cem_matches, "cem_matches_Sturges_Mar5.rds")
-            
+                
+# Next steps ####
+
+# 1. Inspect matched strata
+
+# Examining the cutpoints                                
+cutpoints <- cem_match$breaks 
+print(cutpoints)              # reveals 16 cutpoints for each
+
+# Looking at balance
+
+print(cem_balance)            # reveals that the matching was successful
+                
+# 2. Run analyses with cem matched sample
+
+cem_matches <- readRDS("cem_matches_Sturges_Mar5.rds")                
+
+# Extract all observations for matched firms including stata and matching weights
+panel_matched <- left_join(
+  panel_intersection,
+  cem_matches %>% select(reprisk_id, w, strata),
+  by = "reprisk_id"
+)
+panel_matched$reprisk_strata <- paste(panel_matched$reprisk_id, panel_matched$strata, sep = "_")
+
+# Run analyses with matched sample
+model <- feols(total_incident_count ~ cdp_sc_member + log(at_gbp_winsorized_1) + supplier_count + prop_suppliers_cdp_sc +
+                 + roa_winsorized_1 
+                 + CSO
+                 | reprisk_strata + year, # Firm and time fixed effects
+               data = panel_matched,
+               cluster = "reprisk_strata",
+               weights = panel_matched$w)
+summary(model)
+
+# 3. Use new DV (from RepRisk) to run analyses
+# Reading in the raw RepRisk data
+reprisk_incidents <- read_csv('/Users/william.diebel/Dropbox/Mac (2)/Documents/Data/RepRisk Datafeed/Incidents.csv')
+reprisk_incidents$reprisk_id <- as.character(reprisk_incidents$reprisk_id)
+  # filtering for environmental incidents
+reprisk_environmental_incidents <- reprisk_incidents %>% filter(environment == TRUE)
+  # creating a year variable
+reprisk_environmental_incidents$year <- year(reprisk_environmental_incidents$incident_date)
+  # aggregating incidents by firm and year
+reprisk_environmental_incidents <- reprisk_environmental_incidents %>%
+  group_by(reprisk_id, year) %>%
+  summarise(environmental_incident_count = n()) %>%
+  ungroup()
+  # merging with panel_matched
+panel_matched <- left_join(panel_matched, reprisk_environmental_incidents, by = c("reprisk_id", "year")) 
+
+panel_matched <- panel_matched %>% filter(w > 0) # removing obs with zero weight          
+
+  # having a look at the new DV compared to the environmental supply chain incidents (total_incident_count)
+  # mainly just wanted to verify that the total_incident_count is represented in a similar way to the environmental_incident_count
+panel_matched %>% select(conm, year, total_incident_count, environmental_incident_count) %>% arrange(desc(total_incident_count)) %>% view()
+  # manual inspection reveals that the environmental SC incidents tracks with total env incidents and is less than env incidents in all but one case (2 vs 1) which generally indicates high internal validity
+panel_matched$environmental_incident_count <- panel_matched$environmental_incident_count %>% replace_na(0) # replacing NAs with 0s
+
+# Run analyses with new DV
+model <- feols(environmental_incident_count ~ cdp_sc_member + log(at_gbp_winsorized_1) + supplier_count + prop_suppliers_cdp_sc +
+                 + roa_winsorized_1 
+               + CSO
+               | reprisk_strata + year, # Firm and time fixed effects
+               data = panel_matched,
+               cluster = "reprisk_strata",
+               weights = panel_matched$w)
+summary(model)
+
+model <- feols(environmental_incident_count ~ cdp_sc_member + CSO*log(at_gbp_winsorized_1) + supplier_count + prop_suppliers_cdp_sc +
+                 + roa_winsorized_1 
+               | reprisk_strata + year, # Firm and time fixed effects
+               data = panel_matched,
+               cluster = "reprisk_strata",
+               weights = panel_matched$w)
+summary(model)
