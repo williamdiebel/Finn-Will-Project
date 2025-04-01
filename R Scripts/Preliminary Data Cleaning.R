@@ -450,10 +450,9 @@ summary(model)
 # Reading in the raw RepRisk data
 reprisk_incidents <- read_csv('/Users/william.diebel/Dropbox/Mac (2)/Documents/Data/RepRisk Datafeed/Incidents.csv')
 reprisk_incidents$reprisk_id <- as.character(reprisk_incidents$reprisk_id)
+reprisk_incidents$year <- year(reprisk_incidents$incident_date)
   # filtering for environmental incidents
 reprisk_environmental_incidents <- reprisk_incidents %>% filter(environment == TRUE)
-  # creating a year variable
-reprisk_environmental_incidents$year <- year(reprisk_environmental_incidents$incident_date)
   # aggregating incidents by firm and year
 reprisk_environmental_incidents <- reprisk_environmental_incidents %>%
   group_by(reprisk_id, year) %>%
@@ -486,4 +485,120 @@ model <- feols(environmental_incident_count ~ cdp_sc_member + CSO*log(at_gbp_win
                data = panel_matched,
                cluster = "reprisk_strata",
                weights = panel_matched$w)
+summary(model)
+
+# Adding some other potential DV vbls
+    # Social incidents
+reprisk_social_incidents <- reprisk_incidents %>% filter(social == TRUE)
+reprisk_social_incidents <- reprisk_social_incidents %>%
+  group_by(reprisk_id, year) %>%
+  summarise(social_incident_count = n()) %>%
+  ungroup()
+    # Climate incidents
+reprisk_climate_incidents <- reprisk_incidents %>% filter(climate_ghg_pollution == TRUE | greenhouse_gas_emissions == TRUE)
+reprisk_climate_incidents <- reprisk_climate_incidents %>%
+  group_by(reprisk_id, year) %>%
+  summarise(climate_incident_count = n()) %>%
+  ungroup()
+
+panel_matched <- left_join(panel_matched, reprisk_social_incidents, by = c("reprisk_id", "year")) 
+panel_matched <- left_join(panel_matched, reprisk_climate_incidents, by = c("reprisk_id", "year")) 
+
+panel_matched$social_incident_count <- panel_matched$social_incident_count %>% replace_na(0) # replacing NAs with 0s
+panel_matched$climate_incident_count <- panel_matched$climate_incident_count %>% replace_na(0) # replacing NAs with 0s
+
+# Run analyses with new DVs
+model <- feols(social_incident_count ~ cdp_sc_member + log(at_gbp_winsorized_1) + supplier_count + prop_suppliers_cdp_sc +
+                 + roa_winsorized_1 
+               + CSO
+               | reprisk_strata + year, # Firm and time fixed effects
+               data = panel_matched,
+               cluster = "reprisk_strata",
+               weights = panel_matched$w)
+summary(model)
+
+model <- feols(climate_incident_count ~ cdp_sc_member + log(at_gbp_winsorized_1) + supplier_count + prop_suppliers_cdp_sc +
+                 + roa_winsorized_1 
+               + CSO
+               | reprisk_strata + year, # Firm and time fixed effects
+               data = panel_matched,
+               cluster = "reprisk_strata",
+               weights = panel_matched$w)
+summary(model)
+
+# Looking at mfg industries
+panel_matched %>% filter(pre_treatment == 1) %>% group_by(FourDigitName) %>% count() %>% arrange(desc(n)) %>% view()
+
+mfg<-c("Materials", "Automobiles & Components", "Capital Goods", 
+       "Household & Personal Products", "Food & Staples Retailing",
+       "Technology Hardware & Equipment", "Food, Beverage & Tobacco",
+       "Pharmaceuticals, Biotechnology & Life Sciences", "Transportation",
+       "Semiconductors & Semiconductor Equipment"
+)
+mfg_subset <- panel_matched %>% filter(FourDigitName%in%mfg)
+
+model <- feols(environmental_incident_count ~ cdp_sc_member + log(at_gbp_winsorized_1) + supplier_count + prop_suppliers_cdp_sc +
+                 + roa_winsorized_1 
+               + CSO
+               | reprisk_strata + year, # Firm and time fixed effects
+               data = mfg_subset,
+               cluster = "reprisk_strata",
+               weights = mfg_subset$w)
+summary(model)
+
+model <- feols(social_incident_count ~ cdp_sc_member + log(at_gbp_winsorized_1) + supplier_count + prop_suppliers_cdp_sc +
+                 + roa_winsorized_1 
+               + CSO
+               | reprisk_strata + year, # Firm and time fixed effects
+               data = mfg_subset,
+               cluster = "reprisk_strata",
+               weights = mfg_subset$w)
+summary(model)
+
+model <- feols(climate_incident_count ~ cdp_sc_member + log(at_gbp_winsorized_1) + supplier_count + prop_suppliers_cdp_sc +
+                 + roa_winsorized_1 
+               + CSO
+               | reprisk_strata + year, # Firm and time fixed effects
+               data = mfg_subset,
+               cluster = "reprisk_strata",
+               weights = mfg_subset$w)
+summary(model)
+
+treated_mfg <- mfg_subset %>% filter(pre_treatment == 1)
+treated_mfg$reprisk_strata %>% n_distinct()
+
+mfg_subset$reprisk_strata %>% n_distinct()
+
+
+
+panel_intersection <- left_join(panel_intersection, reprisk_environmental_incidents, by = c("reprisk_id", "year"))
+panel_intersection <- left_join(panel_intersection, reprisk_social_incidents, by = c("reprisk_id", "year"))
+panel_intersection <- left_join(panel_intersection, reprisk_climate_incidents, by = c("reprisk_id", "year"))
+
+panel_intersection$social_incident_count <- panel_intersection$social_incident_count %>% replace_na(0) # replacing NAs with 0s
+panel_intersection$environmental_incident_count <- panel_intersection$environmental_incident_count %>% replace_na(0) # replacing NAs with 0s
+panel_intersection$climate_incident_count <- panel_intersection$climate_incident_count %>% replace_na(0) # replacing NAs with 0s
+
+model <- feols(environmental_incident_count ~ cdp_sc_member + log(at_gbp_winsorized_1) + supplier_count + prop_suppliers_cdp_sc +
+                 + roa_winsorized_1 
+               + CSO
+               | reprisk_id + year, # Firm and time fixed effects
+               data = panel_intersection,,
+               cluster = "reprisk_id")
+summary(model)
+
+model <- feols(social_incident_count ~ cdp_sc_member + log(at_gbp_winsorized_1) + supplier_count + prop_suppliers_cdp_sc +
+                 + roa_winsorized_1 
+               + CSO
+               | reprisk_id + year, # Firm and time fixed effects
+               data = panel_intersection,
+               cluster = "reprisk_id")
+summary(model)
+
+model <- feols(climate_incident_count ~ cdp_sc_member + log(at_gbp_winsorized_1) + supplier_count + prop_suppliers_cdp_sc +
+                 + roa_winsorized_1 
+               + CSO
+               | reprisk_id + year, # Firm and time fixed effects
+               data = panel_intersection,
+               cluster = "reprisk_id")
 summary(model)
