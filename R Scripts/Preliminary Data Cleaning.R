@@ -537,7 +537,7 @@ mfg<-c("Materials", "Automobiles & Components", "Capital Goods",
 )
 mfg_subset <- panel_matched %>% filter(FourDigitName%in%mfg)
 
-model <- feols(environmental_incident_count ~ cdp_sc_member + log(at_gbp_winsorized_1) + supplier_count + prop_suppliers_cdp_sc +
+model <- feols(environmental_incident_count ~ log(at_gbp_winsorized_1) 
                  + roa_winsorized_1 
                + CSO
                | reprisk_strata + year, # Firm and time fixed effects
@@ -546,7 +546,7 @@ model <- feols(environmental_incident_count ~ cdp_sc_member + log(at_gbp_winsori
                weights = mfg_subset$w)
 summary(model)
 
-model <- feols(social_incident_count ~ cdp_sc_member + log(at_gbp_winsorized_1) + supplier_count + prop_suppliers_cdp_sc +
+model <- feols(social_incident_count ~ log(at_gbp_winsorized_1)
                  + roa_winsorized_1 
                + CSO
                | reprisk_strata + year, # Firm and time fixed effects
@@ -555,7 +555,7 @@ model <- feols(social_incident_count ~ cdp_sc_member + log(at_gbp_winsorized_1) 
                weights = mfg_subset$w)
 summary(model)
 
-model <- feols(climate_incident_count ~ cdp_sc_member + log(at_gbp_winsorized_1) + supplier_count + prop_suppliers_cdp_sc +
+model <- feols(climate_incident_count ~ log(at_gbp_winsorized_1)
                  + roa_winsorized_1 
                + CSO
                | reprisk_strata + year, # Firm and time fixed effects
