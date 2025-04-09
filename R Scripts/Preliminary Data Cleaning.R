@@ -422,7 +422,7 @@ print(cutpoints)              # reveals 16 cutpoints for each
 
 # Looking at balance
 
-print(cem_balance)            # reveals that the matching was successful
+print(cem_match)            # reveals that the matching was successful
                 
 # 2. Run analyses with cem matched sample
 
@@ -602,3 +602,33 @@ model <- feols(climate_incident_count ~ cdp_sc_member + log(at_gbp_winsorized_1)
                data = panel_intersection,
                cluster = "reprisk_id")
 summary(model)
+
+saveRDS(panel_intersection, "panel_intersection_april9.rds")
+
+# April 9, 2025 ####
+setwd("~/Dropbox/Will:Finn Shared/Data")
+library(tidyverse)
+panel_intersection <- readRDS("panel_intersection_april9.rds") # 
+# Looking at pre- and post- average incident values in-line with
+# discussion on April 9 2025.
+
+  # Capturing all CSO firms
+treated <- panel_intersection %>% filter(CSO == 1)
+  # Capturing all CSO firm-year observations
+treated <- panel_intersection[which(panel_intersection$reprisk_id %in% 
+                                      treated$reprisk_id), ]
+  # Subsetting CSO firm-year observations based on pre- and post-treatment firm-year observations
+treated_pre <- treated %>% filter(CSO==0)
+treated_post <- treated %>% filter(CSO==1)
+  # Creating a table to report pre- and post-treatment means
+pre_and_post_dvs <- data.frame(DV = c("Environmental Incident Count", 
+                                 "Social Incident Count", 
+                                 "Climate Incident Count"),
+                               pre_mean = c(mean(treated_pre$environmental_incident_count, na.rm = TRUE),
+                                       mean(treated_pre$social_incident_count, na.rm = TRUE),
+                                       mean(treated_pre$climate_incident_count, na.rm = TRUE)),
+                               post_mean = c(mean(treated_post$environmental_incident_count, na.rm = TRUE),
+                                        mean(treated_post$social_incident_count, na.rm = TRUE),
+                                        mean(treated_post$climate_incident_count, na.rm = TRUE)))
+pre_and_post_dvs %>% view()
+
