@@ -631,4 +631,9 @@ pre_and_post_dvs <- data.frame(DV = c("Environmental Incident Count",
                                         mean(treated_post$social_incident_count, na.rm = TRUE),
                                         mean(treated_post$climate_incident_count, na.rm = TRUE)))
 pre_and_post_dvs %>% view()
+treated_pre$reprisk_id %>% n_distinct() # [1] 516
+treated_post$reprisk_id %>% n_distinct() # [1] 528 
+  # More reprisk_id in treated_post... should look into.
+
+
 
