@@ -62,8 +62,8 @@ dt_master <- as.data.table(read.csv("./rawdata/Compustat_2008-2024.csv")) %>%
 
 # Merge with CSO and ESG Committee information from BoardEx
 # dt_BoardEx <- load_BoardEx(link_tbl = link)  # BoardEx files were too big for the Dropbox, so I saved the output of this function instead. The code is still at the end of this document.
-dt_BoardEx <- as.data.table(readRDS("./secdata/BoardEx.rds"))
-dt_master <- merge(dt_master[, .(gvkey, cusip, Year)], dt_BoardEx[, .(gvkey, Year, CSO, ESG_Committee)],
+# dt_BoardEx <- as.data.table(readRDS("./secdata/BoardEx.rds"))
+dt_master <- merge(dt_master[, .(gvkey, cusip, Year)], dt_BoardEx[, .(gvkey, Year, CSO, ESG_Committee, OtherCSO, OtherESG_Committee)],
   all.x = TRUE,
   by.x = c("gvkey", "Year"), by.y = c("gvkey", "Year")
 )
@@ -99,15 +99,18 @@ dt_Refinitiv <- dt_Refinitiv %>%
   .[, ESG_Incentives := ifelse(is.na(PolicyExecutiveCompensationESGPerformance), 0, PolicyExecutiveCompensationESGPerformance)] %>%
   .[, SupplierESGTraining := ifelse(is.na(SupplierESGTraining), 0, SupplierESGTraining)]
 
-dt_master <- merge(dt_master, dt_Refinitiv[, .(cusip, year, ESG_Incentives, SupplierESGTraining)],
-  all.x = TRUE,
-  by.x = c("cusip", "Year"), by.y = c("cusip", "year")
+dt_master <- merge(dt_master, dt_Refinitiv[, .(
+  cusip, year, ESG_Incentives,
+  SupplierESGTraining, ESGScore_Value, ESGCombinedScore_Value, ESGCControversiesScore_Value
+)],
+all.x = TRUE,
+by.x = c("cusip", "Year"), by.y = c("cusip", "year")
 )
 
 
 write.csv(dt_master,
   row.names = FALSE,
-  file = "./02_Data/secdata/IndependentVariables_07232024.csv"
+  file = "./secdata/IndependentVariables_06252025.csv"
 )
 
 
@@ -275,22 +278,38 @@ load_BoardEx <- function(link_tbl = NULL) {
 }
 
 load_Refinitive <- function() {
-  dt_screening <- fread("./02_Data/rawdata/Asset4.csv")
+  dt_screening <- fread("./rawdata/Asset4.csv")
 
 
   dt_screening <- dt_screening %>%
     .[fieldname %in% c(
+      "ESGCombinedScore",
+      "ESGScore",
       "PolicyExecutiveCompensationESGPerformance",
-      "SupplierESGTraining"
+      "SupplierESGTraining",
+      "EnvironmentalSupplyChainManagement",
+      "EnvironmentalSupplyChainMonitoring",
+      "ESGCControversiesScore"
     )] %>%
     .[cusip != ""] %>%
     .[, value_nr := ifelse(value == "true", 1, 0)]
 
   dt_screening[, cusip := as.character(cusip)]
+  dt_screening[, orgpermid := as.character(orgpermid)]
 
   dt_screening <- unique(dt_screening, by = c("cusip", "year", "fieldname"))
 
   dt <- dcast(dt_screening, cusip + year ~ fieldname, value.var = c("value_nr"))
+
+  dt[, ESGScore := factor(ESGScore, levels = c("D-", "D", "D+", "C-", "C", "C+", "B-", "B", "B+", "A-", "A", "A+"))]
+  dt[, ESGScore_Value := as.integer(ESGScore)]
+
+  dt[, ESGCombinedScore := factor(ESGCombinedScore, levels = c("D-", "D", "D+", "C-", "C", "C+", "B-", "B", "B+", "A-", "A", "A+"))]
+  dt[, ESGCombinedScore_Value := as.integer(ESGCombinedScore)]
+
+  dt[, ESGCControversiesScore := factor(ESGCControversiesScore, levels = c("D-", "D", "D+", "C-", "C", "C+", "B-", "B", "B+", "A-", "A", "A+"))]
+  dt[, ESGCControversiesScore_Value := as.integer(ESGCControversiesScore)]
+
 
   return(dt)
 }
