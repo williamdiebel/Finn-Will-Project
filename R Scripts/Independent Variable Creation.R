@@ -36,7 +36,7 @@ panel_wd <- panel_wd %>%
   .[headquarter_country_code %in% c("US", "CA")]
 
 ## Link table between Compustat and BoardEx
-link <- as.data.table(read_dta("./02_Data/rawdata/boardex_crsp_compustat_linking_table_16032021.dta"))
+link <- as.data.table(read_dta("./rawdata/boardex_crsp_compustat_linking_table_16032021.dta"))
 link <- unique(link, by = "companyid")
 link <- link[, gvkey := as.numeric(gvkey)]
 
@@ -49,12 +49,12 @@ panel_wd_BoarExCompustatLink <- panel_wd %>%
 
 # Load data from Compustat
 ## Link table between Compustat and BoardEx
-link <- as.data.table(read_dta("./02_Data/rawdata/boardex_crsp_compustat_linking_table_16032021.dta"))
+link <- as.data.table(read_dta("./rawdata/boardex_crsp_compustat_linking_table_16032021.dta"))
 link <- unique(link, by = "companyid")
 link <- link[, gvkey := as.numeric(gvkey)]
 
 
-dt_master <- as.data.table(read.csv("./02_Data/rawdata/Compustat_2008-2024.csv")) %>%
+dt_master <- as.data.table(read.csv("./rawdata/Compustat_2008-2024.csv")) %>%
   .[!is.na(fyear)] %>%
   .[order(gvkey, fyear)] %>%
   .[gvkey %in% unique(link$gvkey)] %>%
@@ -62,7 +62,7 @@ dt_master <- as.data.table(read.csv("./02_Data/rawdata/Compustat_2008-2024.csv")
 
 # Merge with CSO and ESG Committee information from BoardEx
 # dt_BoardEx <- load_BoardEx(link_tbl = link)  # BoardEx files were too big for the Dropbox, so I saved the output of this function instead. The code is still at the end of this document.
-dt_BoardEx <- as.data.table(readRDS("./02_Data/secdata/BoardEx.rds"))
+dt_BoardEx <- as.data.table(readRDS("./secdata/BoardEx.rds"))
 dt_master <- merge(dt_master[, .(gvkey, cusip, Year)], dt_BoardEx[, .(gvkey, Year, CSO, ESG_Committee)],
   all.x = TRUE,
   by.x = c("gvkey", "Year"), by.y = c("gvkey", "Year")
@@ -128,12 +128,12 @@ dt_final <- merge(dt_master[, .(gvkey, Year)],
 
 load_BoardEx <- function(link_tbl = NULL) {
   # CSO Role ----
-  dt_TMT <- as.data.table(read_dta("./02_Data/rawdata/organization_composition_officers_directors_1990_2021.dta"))
+  dt_TMT <- as.data.table(read_dta("C:/Users/fipeters/OneDrive - Indiana University/07_Research/02_CSO and Environmental Injustice/02_Data/rawdata/organization_composition_officers_directors_1990_2021.dta"))
 
 
 
   # CSO Gender
-  dt_TMT_Profiles <- as.data.table(read_dta("./02_Data/rawdata/individual_profile_details.dta"))
+  dt_TMT_Profiles <- as.data.table(read_dta("C:/Users/fipeters/OneDrive - Indiana University/07_Research/02_CSO and Environmental Injustice/02_Data/rawdata/individual_profile_details.dta"))
 
   dt_TMT <- merge(
     dt_TMT,
@@ -186,9 +186,9 @@ load_BoardEx <- function(link_tbl = NULL) {
 
 
   # Committees ----
-  dt_committee <- as.data.table(read_dta("./02_Data/rawdata/organization_board_director_committees.dta"))
+  dt_committee <- as.data.table(read_dta("C:/Users/fipeters/OneDrive - Indiana University/07_Research/02_CSO and Environmental Injustice/02_Data/rawdata/organization_board_director_committees.dta"))
 
-  committees <- read.csv("./02_Data/secdata/organization_board_director_committees.csv") %>%
+  committees <- read.csv("C:/Users/fipeters/OneDrive - Indiana University/07_Research/02_CSO and Environmental Injustice/02_Data/secdata/organization_board_director_committees.csv") %>%
     filter(Combined == "x") %>%
     select(Committee.Name)
 
@@ -257,9 +257,9 @@ load_BoardEx <- function(link_tbl = NULL) {
       # CSO_ED=max(CSOs_ED),
       # CSO_SM=max(CSOs_SM),
       # CSO_Board=max(CSOs_Board),
-      # OtherCSO=mean(OtherCSO),
+      OtherCSO = mean(OtherCSO),
       ESG_Committee = max(ESG_Committee),
-      # OtherESG_Committee=mean(OtherESG_Committees),
+      OtherESG_Committee = mean(OtherESG_Committees),
       # All=max(All),
       # OtherAll=mean(OtherAll),
       # naics_2 = first(naics_2),

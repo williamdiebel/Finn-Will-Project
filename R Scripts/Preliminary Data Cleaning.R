@@ -562,6 +562,7 @@ model <- feols(
 )
 summary(model)
 
+
 # Adding some other potential DV vbls
 # Social incidents
 reprisk_social_incidents <- reprisk_incidents %>% filter(social == TRUE)
