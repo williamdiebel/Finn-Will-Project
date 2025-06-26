@@ -120,6 +120,10 @@ panel_intersection$prop_suppliers_cdp[which(is.na(panel_intersection$prop_suppli
 # Analysis ####
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
+panel_intersection <- panel_intersection %>%
+    filter(!is.na(CSO_Peer)) # removing NA OtherCSO values for IV model
+
+
 # TWFE model
 model <- feols(
     total_incident_count ~ CSO + supplier_count + cdp_sc_member + log(at_gbp) + prop_suppliers_cdp_sc + roa |
@@ -130,8 +134,6 @@ model <- feols(
 summary(model)
 
 # IV model
-panel_intersection <- panel_intersection %>%
-    filter(!is.na(OtherCSO)) # removing NA OtherCSO values for IV model
 
 
 ## 0-stage probit model

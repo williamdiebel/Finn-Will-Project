@@ -273,13 +273,17 @@ load_BoardEx <- function(link_tbl = NULL) {
     .(gvkey, Year)
   ]
 
+  # Create a new column with the maximum CSO value from prior years
+  dt_BoardEx[, CSO_max_prior := shift(cummax(CSO), fill = 0, type = "lag"), by = gvkey]
+  dt_BoardEx[, ESG_Committee_max_prior := shift(cummax(ESG_Committee), fill = 0, type = "lag"), by = gvkey]
+
   # Merge with Hoberg-Phillips data
   dt_hoberg <- fread("C:/Users/fipeters/OneDrive - Indiana University/07_Research/00_Data/Hoberg-Phillips Data/Data/ETNIC2_top50.csv",
     header = TRUE
   )
 
   # Ratio of indirect peer firms (5 to 20) with a CSO
-  dt_hoberg <- merge(dt_hoberg, dt_BoardEx[, .(gvkey, Year, CSO)],
+  dt_hoberg <- merge(dt_hoberg, dt_BoardEx[, .(gvkey, Year, CSO_max_prior)],
     all.x = TRUE,
     by.x = c("gvkey2", "year"),
     by.y = c("gvkey", "Year")
@@ -290,7 +294,7 @@ load_BoardEx <- function(link_tbl = NULL) {
   dt_hoberg <- dt_hoberg %>%
     .[year >= 1999] %>%
     .[peer_rating >= 5 & peer_rating <= 50] %>%
-    .[, .(CSO_Peer = mean(CSO, na.rm = TRUE)), by = .(gvkey1, year)]
+    .[, .(CSO_Peer = mean(CSO_max_prior, na.rm = TRUE)), by = .(gvkey1, year)]
 
   # Merge with BoardEx data
   dt_BoardEx <- merge(dt_BoardEx, dt_hoberg,
