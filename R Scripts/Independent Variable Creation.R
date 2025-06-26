@@ -60,10 +60,11 @@ dt_master <- as.data.table(read.csv("./rawdata/Compustat_2008-2024.csv")) %>%
   .[gvkey %in% unique(link$gvkey)] %>%
   .[, Year := fyear]
 
+
 # Merge with CSO and ESG Committee information from BoardEx
 # dt_BoardEx <- load_BoardEx(link_tbl = link)  # BoardEx files were too big for the Dropbox, so I saved the output of this function instead. The code is still at the end of this document.
 # dt_BoardEx <- as.data.table(readRDS("./secdata/BoardEx.rds"))
-dt_master <- merge(dt_master[, .(gvkey, cusip, Year)], dt_BoardEx[, .(gvkey, Year, CSO, ESG_Committee, OtherCSO, OtherESG_Committee)],
+dt_master <- merge(dt_master[, .(gvkey, cusip, Year)], dt_BoardEx[, .(gvkey, Year, CSO, ESG_Committee, OtherCSO, OtherESG_Committee, CSO_Peer)],
   all.x = TRUE,
   by.x = c("gvkey", "Year"), by.y = c("gvkey", "Year")
 )
@@ -132,7 +133,6 @@ dt_final <- merge(dt_master[, .(gvkey, Year)],
 load_BoardEx <- function(link_tbl = NULL) {
   # CSO Role ----
   dt_TMT <- as.data.table(read_dta("C:/Users/fipeters/OneDrive - Indiana University/07_Research/02_CSO and Environmental Injustice/02_Data/rawdata/organization_composition_officers_directors_1990_2021.dta"))
-
 
 
   # CSO Gender
@@ -245,6 +245,8 @@ load_BoardEx <- function(link_tbl = NULL) {
       by.y = c("companyid"), all.x = FALSE, all.y = FALSE
     )
 
+
+
     # Create IVs as "fraction of directors on the board who sit on other boards of other companies (excluding focal company) with XYZ"
   }
 
@@ -263,16 +265,39 @@ load_BoardEx <- function(link_tbl = NULL) {
       OtherCSO = mean(OtherCSO),
       ESG_Committee = max(ESG_Committee),
       OtherESG_Committee = mean(OtherESG_Committees),
-      # All=max(All),
-      # OtherAll=mean(OtherAll),
+      All = max(All),
+      OtherAll = mean(OtherAll),
       # naics_2 = first(naics_2),
       Count_Executives = sum(Seniority == "Executive Director")
     ),
     .(gvkey, Year)
   ]
 
-  # dt_BoardEx[, Industry_CSO_Inclusive := mean(CSO, na.rm = TRUE), by = .(Year, naics_2)]
-  # dt_BoardEx[, Industry_CSO_Exclusive := mean(CSO[gvkey != .BY[[1]]], na.rm = TRUE), by = .(Year, naics_2)]
+  # Merge with Hoberg-Phillips data
+  dt_hoberg <- fread("C:/Users/fipeters/OneDrive - Indiana University/07_Research/00_Data/Hoberg-Phillips Data/Data/ETNIC2_top50.csv",
+    header = TRUE
+  )
+
+  # Ratio of indirect peer firms (5 to 20) with a CSO
+  dt_hoberg <- merge(dt_hoberg, dt_BoardEx[, .(gvkey, Year, CSO)],
+    all.x = TRUE,
+    by.x = c("gvkey2", "year"),
+    by.y = c("gvkey", "Year")
+  )
+
+  # summarize hoberg data by firm-year for top 5-25 peers
+  # Considers only those peers that have a BoardEx record, could be changed by setting NA to 0
+  dt_hoberg <- dt_hoberg %>%
+    .[year >= 1999] %>%
+    .[peer_rating >= 5 & peer_rating <= 50] %>%
+    .[, .(CSO_Peer = mean(CSO, na.rm = TRUE)), by = .(gvkey1, year)]
+
+  # Merge with BoardEx data
+  dt_BoardEx <- merge(dt_BoardEx, dt_hoberg,
+    all.x = TRUE,
+    by.x = c("gvkey", "Year"),
+    by.y = c("gvkey1", "year")
+  )
 
   return(dt_BoardEx)
 }
