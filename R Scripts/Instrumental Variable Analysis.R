@@ -126,6 +126,14 @@ panel_intersection <- panel_intersection %>%
 
 # TWFE model
 model <- feols(
+    total_incident_count ~ CSO |
+        reprisk_id + year, # Firm and time fixed effects
+    data = panel_intersection,
+    cluster = "reprisk_id"
+)
+summary(model)
+
+model <- feols(
     total_incident_count ~ CSO + supplier_count + cdp_sc_member + log(at_gbp) + prop_suppliers_cdp_sc + roa |
         reprisk_id + year, # Firm and time fixed effects
     data = panel_intersection,
@@ -134,61 +142,33 @@ model <- feols(
 summary(model)
 
 # IV model
+# First stage: predicting CSO using CSO_Peer and other controls
+model <- feols(
+    total_incident_count ~ supplier_count + cdp_sc_member + log(at_gbp) + prop_suppliers_cdp_sc + roa |
+        reprisk_id + year | # Firm and time fixed effects
+        CSO ~ CSO_Peer, # Instrumental variable
+    data = panel_intersection,
+    cluster = "reprisk_id"
+)
+summary(model)
 
 
-## 0-stage probit model
+## IV model with 0-stage probit model
 model_probit <- feglm(
-    CSO ~ OtherCSO + supplier_count + cdp_sc_member + log(at_gbp) + prop_suppliers_cdp_sc + roa |
+    CSO ~ CSO_Peer + supplier_count + cdp_sc_member + log(at_gbp) + prop_suppliers_cdp_sc + roa |
         year,
     data = panel_intersection,
     fixef.rm = "none",
     family = binomial(link = "probit")
 )
+summary(model_probit)
 
 panel_intersection$CSOfitted <- fitted(model_probit)
-
+# First stage: predicting CSO using fitted values from 0-stage probit
 model <- feols(
     total_incident_count ~ supplier_count + cdp_sc_member + log(at_gbp) + prop_suppliers_cdp_sc + roa |
         reprisk_id + year | # Firm and time fixed effects
         CSO ~ CSOfitted, # Instrumental variable
-    data = panel_intersection,
-    cluster = "reprisk_id"
-)
-summary(model)
-
-
-
-
-
-
-model <- feols(
-    total_incident_count ~ cdp_sc_member + log(at_gbp) + supplier_count + prop_suppliers_cdp_sc +
-        +roa
-        + CSO |
-        FourDigitName + year, # Industry and time fixed effects
-    data = panel_intersection,
-    cluster = "reprisk_id"
-)
-summary(model)
-
-# Winsorized models
-
-# TWFE models
-model <- feols(
-    total_incident_count ~ cdp_sc_member + log(at_gbp_winsorized_1) + supplier_count + prop_suppliers_cdp_sc +
-        +roa_winsorized_1
-        + CSO |
-        reprisk_id + year, # Firm and time fixed effects
-    data = panel_intersection,
-    cluster = "reprisk_id"
-)
-summary(model)
-
-model <- feols(
-    total_incident_count ~ cdp_sc_member + log(at_gbp_winsorized_1) + supplier_count + prop_suppliers_cdp_sc +
-        +roa_winsorized_1
-        + CSO |
-        FourDigitName + year, # Industry and time fixed effects
     data = panel_intersection,
     cluster = "reprisk_id"
 )
