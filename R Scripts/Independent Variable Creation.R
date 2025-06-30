@@ -101,7 +101,7 @@ by.x = c("cusip", "Year"), by.y = c("cusip", "year")
 
 write.csv(dt_master,
   row.names = FALSE,
-  file = "./secdata/IndependentVariables_06252025.csv"
+  file = "./secdata/IndependentVariables_06302025.csv"
 )
 
 
