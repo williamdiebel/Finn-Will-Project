@@ -16,7 +16,7 @@ library(gridExtra) # For arranging multiple plots
 # *Feb 2025 update: reading in the rrpanel_comp_fs_fortune_cdp.rds data
 # instead of pre-matched data_essay2_robustness_v2.rds
 panel_wd <- readRDS("rrpanel_comp_fs_fortune_cdp.rds")
-panel_fp <- read.csv("IndependentVariables_06252025.csv")
+panel_fp <- read.csv("IndependentVariables_06302025.csv")
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # Data cleaning ####
@@ -70,10 +70,10 @@ panel_fp_dupes <- panel_fp %>% filter(gvkey_year %in% duplicate_gvkey_year_list)
 panel_fp_non_dupes <- panel_fp %>%
     filter(!(gvkey_year %in% duplicate_gvkey_year_list))
 
-# for each duplicated f/y combo, keep the one with CSO or ESG == 1
+# for each duplicated f/y combo, keep the one with CSO == 1
 panel_fp_dupes_cleaned <- panel_fp_dupes %>%
     group_by(gvkey_year) %>%
-    arrange(desc(CSO), desc(ESG_Committee)) %>%
+    arrange(desc(CSO)) %>%
     slice(1) %>%
     ungroup()
 
@@ -152,6 +152,15 @@ model <- feols(
 )
 summary(model)
 
+# First stage: predicting CSO using ratio of directors
+model <- feols(
+    total_incident_count ~ supplier_count + cdp_sc_member + log(at_gbp) + prop_suppliers_cdp_sc + roa |
+        reprisk_id + year | # Firm and time fixed effects
+        CSO ~ BoardCSOExperience, # Instrumental variable
+    data = panel_intersection,
+    cluster = "reprisk_id"
+)
+summary(model)
 
 ## IV model with 0-stage probit model
 model_probit <- feglm(
